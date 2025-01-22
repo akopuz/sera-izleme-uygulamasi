@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sera İzleme Uygulaması</title>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.1.3/dist/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@1.0.0/dist/chartjs-adapter-date-fns.min.js"></script>
+
+    <style>
+                body { 
+            font-family: Arial, sans-serif; 
+            background-color: #f0f2f5; 
+            color: #333; 
+            display: flex; 
+            justify-content: space-between; 
+        }
+        .container { 
+            display: flex; 
+            width: 100%; 
+            max-width: 1100px; 
+            margin: 40px auto; 
+        }
+        .column { 
+            flex: 1; 
+            padding: 20px; 
+            margin: 10px; 
+            background-color: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); 
+        }
+        .column h2 { 
+            color: #4CAF50; 
+            font-size: 1.8em; 
+            margin-bottom: 20px; 
+        }
+        .header { 
+            text-align: center; 
+            font-size: 2em; 
+            color: #4CAF50; 
+            margin-bottom: 40px; 
+        }
+        .data-item { 
+            display: flex; 
+            justify-content: space-between; 
+            background-color: #f9f9f9; 
+            margin-bottom: 15px; 
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
+            font-size: 1.2em; 
+        }
+        .form-container { 
+            padding: 20px; 
+            background-color: #f7f7f7; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
+        }
+        .form-container input, .form-container select { 
+            padding: 10px; 
+            margin-bottom: 15px; 
+            width: 100%; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .form-container button { 
+            padding: 12px 20px; 
+            background-color: #4CAF50; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 1.1em; 
+        }
+        .form-container button:hover { 
+            background-color: #45a049; 
+        }
+        .chart-container { 
+            width: 100%; 
+            max-width: 1000px; 
+            margin: 20px auto; 
+        }
+    </style>
+</head>
+<body>
+
+
+    <div class="container">
+        <div class="column" id="dataColumn">
+            <h2>Real-Time Data</h2>
+
+            <div class="data-item">
+                <strong>Device ID:</strong> <span id="device_id">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Temperature 1 (C):</strong> <span id="temperature_1">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Temperature 2 (C):</strong> <span id="temperature_2">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Humidity (%):</strong> <span id="humidity">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Water Level:</strong> <span id="water_level">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Pressure (Pa)</strong> <span id="pressure">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Altitude (m):</strong> <span id="altitude">N/A</span>
+            </div>
+            <div class="data-item">
+                <strong>Sea Level Pressure (Pa):</strong> <span id="sea_level_pressure">N/A</span>
+            </div>
+        </div>
+
+        <div class="column" id="ruleColumn">
+            <h2>Set Notification Rule</h2>
+            <div class="form-container">
+                <form id="ruleForm">
+                    <label for="email">Email Address:</label>
+                    <input type="email" id="email" required placeholder="Enter your email" />
+
+                    <label for="parameter">Select Parameter:</label>
+                    <select id="parameter" required>
+                        <option value="temperature_1">Temperature 1</option>
+                        <option value="temperature_2">Temperature 2</option>
+                        <option value="humidity">Humidity</option>
+                        <option value="water_level">Water Level</option>
+                        <option value="pressure">Pressure</option>
+                        <option value="altitude">Altitude</option>
+                        <option value="sea_level_pressure">Sea Level Pressure</option>
+                    </select>
+
+                    <label for="condition">Select Condition:</label>
+                    <select id="condition" required>
+                        <option value="greater_than">Greater than</option>
+                        <option value="less_than">Less than</option>
+                    </select>
+
+                    <label for="value">Set Value:</label>
+                    <input type="number" id="value" required placeholder="Enter the value" />
+
+                    <button type="submit">Save Rule</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io.connect('http://localhost:5000');
+        socket.on('new_data', function(data) {
+            document.getElementById('device_id').innerText = data.device_id || 'N/A';
+            document.getElementById('temperature_1').innerText = data.temperature_1 || 'N/A';
+            document.getElementById('temperature_2').innerText = data.temperature_2 || 'N/A';
+            document.getElementById('humidity').innerText = data.humidity || 'N/A';
+            document.getElementById('water_level').innerText = data.water_level || 'N/A';
+            document.getElementById('pressure').innerText = data.pressure || 'N/A';
+            document.getElementById('altitude').innerText = data.altitude || 'N/A';
+            document.getElementById('sea_level_pressure').innerText = data.sea_level_pressure || 'N/A';
+
+
+            checkRule(data);
+        });
+
+        function checkRule(data) {
+            const email = localStorage.getItem('email');
+            const param = localStorage.getItem('parameter');
+            const condition = localStorage.getItem('condition');
+            const value = parseFloat(localStorage.getItem('value'));
+
+            if (email && param && condition && value) {
+                const paramValue = data[param];
+
+                if (paramValue !== undefined) {
+                    let conditionMet = false;
+
+                    if (condition === 'greater_than' && paramValue > value) {
+                        conditionMet = true;
+                    } else if (condition === 'less_than' && paramValue < value) {
+                        conditionMet = true;
+                    }
+
+    
+                }
+            }
+        }
+
+        document.getElementById('ruleForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const parameter = document.getElementById('parameter').value;
+            const condition = document.getElementById('condition').value;
+            const value = document.getElementById('value').value;
+
+            localStorage.setItem('email', email);
+            localStorage.setItem('parameter', parameter);
+            localStorage.setItem('condition', condition);
+            localStorage.setItem('value', value);
+
+
+            fetch('http://localhost:5005/api/rules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: email,
+                    parameter: parameter,
+                    condition: condition,
+                    value: value,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Rule saved successfully!');
+                } else {
+                    alert('Failed to save rule!');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error saving rule');
+            });
+        });
+    </script>
+
+<div class="column" id="queryColumn">
+    <h2>Query Data & View Graph</h2>
+    <div class="form-container">
+        <form id="queryForm">
+            <label for="start-date">Start Date & Time:</label>
+            <input type="datetime-local" id="start-date" required />
+        
+            <label for="end-date">End Date & Time:</label>
+            <input type="datetime-local" id="end-date" required />
+        
+            <label for="data-type">Select Data Type:</label>
+            <select id="data-type" required>
+                <option value="temperature_1">Temperature 1</option>
+                <option value="temperature_2">Temperature 2</option>
+                <option value="humidity">Humidity</option>
+                <option value="water_level">Water Level</option>
+                <option value="pressure">Pressure</option>
+                <option value="altitude">Altitude</option>
+                <option value="sea_level_pressure">Sea Level Pressure</option>
+            </select>
+        
+            <button type="submit">Query Data</button>
+        </form>
+    </div>
+    <div class="chart-container">
+        <canvas id="dataChart"></canvas>
+    </div>
+</div>
+</div>
+
+<script>
+
+const ctx = document.getElementById('dataChart').getContext('2d');
+let dataChart;
+
+function renderChart(data, parameter) {
+
+    const values = data.map(item => item[parameter]); 
+
+
+    const labels = values.map((_, index) => index + 1); 
+
+
+    if (dataChart) {
+        dataChart.destroy();
+    }
+
+
+    dataChart = new Chart(ctx, {
+        type: 'line', 
+        data: {
+            labels: labels, 
+            datasets: [{
+                label: parameter,
+                data: values, 
+                borderColor: 'rgba(75, 192, 192, 1)', 
+                backgroundColor: 'rgba(75, 192, 192, 0.2)', 
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { 
+                    type: 'linear', 
+                    position: 'bottom',
+                    title: {
+                        display: true,
+                        text: 'Data Point' 
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: parameter 
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+document.getElementById('queryForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const startTime = document.getElementById('start-date').value;
+    const endTime = document.getElementById('end-date').value;
+    const parameter = document.getElementById('data-type').value;
+
+    console.log("Start Time:", startTime);
+    console.log("End Time:", endTime);
+    console.log("Parameter:", parameter);
+
+
+    console.log("Sending request...");  
+
+    fetch('http://localhost:5006/api/query-data', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            start_time: startTime,
+            end_time: endTime,
+            parameter: parameter,
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Response from API:', data); 
+        if (data.success) {
+            renderChart(data.data, parameter); 
+        } else {
+            alert('Error querying data: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('API request failed');
+    });
+});
+</script>
+
+</body>
+
+</html>
